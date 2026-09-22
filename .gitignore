@@ -1,0 +1,23 @@
+# Environment Variables & Kredensial Rahasia
+.env
+.env.local
+.env.*.local
+
+# Editor & IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+error_log
+config.php
