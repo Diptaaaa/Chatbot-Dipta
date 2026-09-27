@@ -2,43 +2,90 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/groq.php';
 
-// --- Buat Obrolan Baru (Shortcut ?new=1) ---
-if (isset($_GET['new'])) {
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Inisialisasi Token CSRF (Mendukung Session Lokal & Stateless Double-Submit Cookie di Serverless Vercel)
+if (empty($_COOKIE['dipta_csrf'])) {
+    $csrf_token = bin2hex(random_bytes(32));
+    setcookie('dipta_csrf', $csrf_token, [
+        'expires' => time() + 86400 * 7,
+        'path' => '/',
+        'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'httponly' => false,
+        'samesite' => 'Lax'
+    ]);
+} else {
+    $csrf_token = $_COOKIE['dipta_csrf'];
+}
+$_SESSION['csrf_token'] = $csrf_token;
+
+function get_expected_csrf_token() {
+    return $_COOKIE['dipta_csrf'] ?? ($_SESSION['csrf_token'] ?? '');
+}
+
+header("X-Content-Type-Options: nosniff");
+header("X-Frame-Options: SAMEORIGIN");
+header("Referrer-Policy: strict-origin-when-cross-origin");
+
+// --- Buat Obrolan Baru (Shortcut ?new=1 atau POST) ---
+if (isset($_GET['new']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'new_room')) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $token = $_POST['csrf_token'] ?? '';
+        if (!hash_equals(get_expected_csrf_token(), $token)) {
+            http_response_code(403);
+            die("Token keamanan tidak valid.");
+        }
+    }
     $default_title = "Obrolan Baru";
     $stmt = $conn->prepare("INSERT INTO rooms (judul) VALUES (?)");
-    $stmt->bind_param("s", $default_title);
-    $stmt->execute();
-    $new_id = $conn->insert_id;
-    $stmt->close();
-    header("Location: " . $_SERVER['PHP_SELF'] . "?room_id=" . $new_id);
-    exit;
+    if ($stmt) {
+        $stmt->bind_param("s", $default_title);
+        $stmt->execute();
+        $new_id = $conn->insert_id;
+        $stmt->close();
+        header("Location: " . $_SERVER['PHP_SELF'] . "?room_id=" . $new_id);
+        exit;
+    }
 }
 
 // --- Tambah Room Manual via Form ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['judul_room']) && trim($_POST['judul_room']) !== '') {
+    $token = $_POST['csrf_token'] ?? '';
+    if (!hash_equals(get_expected_csrf_token(), $token)) {
+        http_response_code(403);
+        die("Token keamanan tidak valid.");
+    }
     $judul = trim($_POST['judul_room']);
     $stmt = $conn->prepare("INSERT INTO rooms (judul) VALUES (?)");
-    $stmt->bind_param("s", $judul);
-    $stmt->execute();
-    $new_id = $conn->insert_id;
-    $stmt->close();
-    header("Location: " . $_SERVER['PHP_SELF'] . "?room_id=" . $new_id);
-    exit;
+    if ($stmt) {
+        $stmt->bind_param("s", $judul);
+        $stmt->execute();
+        $new_id = $conn->insert_id;
+        $stmt->close();
+        header("Location: " . $_SERVER['PHP_SELF'] . "?room_id=" . $new_id);
+        exit;
+    }
 }
 
-// --- Hapus Room Bersama Chat-nya ---
-if (isset($_GET['hapus_room'])) {
-    $hapus_id = intval($_GET['hapus_room']);
-    $stmt = $conn->prepare("DELETE FROM chat WHERE room_id = ?");
-    $stmt->bind_param("i", $hapus_id);
-    $stmt->execute();
-    $stmt->close();
-
-    $stmt = $conn->prepare("DELETE FROM rooms WHERE id = ?");
-    $stmt->bind_param("i", $hapus_id);
-    $stmt->execute();
-    $stmt->close();
-
+// --- Hapus Room via POST dengan Proteksi CSRF (Aman dari CSRF via GET) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'hapus_room') {
+    $token = $_POST['csrf_token'] ?? '';
+    if (!hash_equals(get_expected_csrf_token(), $token)) {
+        http_response_code(403);
+        die("Token keamanan CSRF tidak valid.");
+    }
+    $hapus_id = intval($_POST['hapus_id'] ?? 0);
+    if ($hapus_id > 0) {
+        // Otomatis menghapus chat di dalamnya karena relasi FOREIGN KEY ON DELETE CASCADE
+        $stmt = $conn->prepare("DELETE FROM rooms WHERE id = ?");
+        if ($stmt) {
+            $stmt->bind_param("i", $hapus_id);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
     header("Location: " . $_SERVER['PHP_SELF']);
     exit;
 }
@@ -100,8 +147,9 @@ $stmt->close();
     <!-- Stylesheet Utama dengan Cache Buster -->
     <link rel="stylesheet" href="style.css?v=<?= time() ?>">
     
-    <!-- Markdown Parser & Code Syntax Highlighting -->
+    <!-- Markdown Parser, DOMPurify Sanitizer & Code Syntax Highlighting -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
@@ -152,8 +200,10 @@ $stmt->close();
                                 <span class="chat-item-title"><?= htmlspecialchars($room['judul']) ?></span>
                             </a>
                             <button 
+                                type="button"
                                 class="btn-delete-room" 
-                                onclick="hapusRoom(event, <?= $room['id'] ?>, '<?= htmlspecialchars(addslashes($room['judul'])) ?>')" 
+                                data-room-id="<?= $room['id'] ?>" 
+                                data-room-title="<?= htmlspecialchars($room['judul'], ENT_QUOTES, 'UTF-8') ?>" 
                                 title="Hapus Obrolan"
                             >
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -277,6 +327,7 @@ $stmt->close();
             <div class="input-dock">
                 <form id="chatForm">
                     <input type="hidden" name="room_id" id="roomIdInput" value="<?= $room_id ?>">
+                    <input type="hidden" name="csrf_token" id="csrfTokenInput" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
                     <div class="input-dock-main">
                         <textarea 
                             name="pesan" 
@@ -413,11 +464,11 @@ function formatCodeBlocks(container) {
     });
 }
 
-// Render Markdown awal dari riwayat yang sudah ada
+// Render Markdown awal dari riwayat yang sudah ada dengan sanitasi DOMPurify (CWE-79 Defense)
 document.querySelectorAll('.raw-markdown').forEach(rawElem => {
     const renderedElem = rawElem.nextElementSibling;
     if (renderedElem) {
-        renderedElem.innerHTML = marked.parse(rawElem.textContent);
+        renderedElem.innerHTML = DOMPurify.sanitize(marked.parse(rawElem.textContent));
         formatCodeBlocks(renderedElem);
     }
 });
@@ -508,15 +559,27 @@ chatForm.addEventListener('submit', function(e) {
     chatContainer.appendChild(botRow);
     scrollToBottom();
 
-    // 3. Kirim via Fetch ke chat-ajax.php
+    // 3. Kirim via Fetch ke chat-ajax.php dengan proteksi CSRF
     const formData = new FormData(chatForm);
     formData.set('pesan', userText);
 
     fetch('chat-ajax.php', {
         method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': "<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>"
+        },
         body: formData
     })
-    .then(res => res.json())
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(errData => {
+                throw new Error(errData.error || ('HTTP Error ' + res.status));
+            }).catch(jsonErr => {
+                throw new Error(jsonErr.message || ('HTTP Error ' + res.status));
+            });
+        }
+        return res.json();
+    })
     .then(data => {
         // Hapus elemen pengetik
         const typingElem = document.getElementById(typingId);
@@ -538,7 +601,8 @@ chatForm.addEventListener('submit', function(e) {
         chatContainer.appendChild(newBotRow);
 
         const renderedContainer = newBotRow.querySelector('.rendered-markdown');
-        renderedContainer.innerHTML = marked.parse(botReply);
+        // Sanitasi output Markdown dengan DOMPurify sebelum di-render ke innerHTML
+        renderedContainer.innerHTML = DOMPurify.sanitize(marked.parse(botReply));
         formatCodeBlocks(renderedContainer);
         scrollToBottom();
 
@@ -591,9 +655,9 @@ const deleteModalDesc = document.getElementById('deleteModalDesc');
 const btnCancelDelete = document.getElementById('btnCancelDelete');
 const btnConfirmDelete = document.getElementById('btnConfirmDelete');
 
-function hapusRoom(event, id, judul) {
-    event.stopPropagation();
-    event.preventDefault();
+const csrfTokenGlobal = "<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>";
+
+function bukaModalHapus(id, judul) {
     targetDeleteId = id;
     
     // Format teks deskripsi yang aman & elegan
@@ -602,6 +666,17 @@ function hapusRoom(event, id, judul) {
     
     deleteModalOverlay.classList.add('show');
 }
+
+// Pasang event listener untuk tombol hapus pada daftar obrolan
+document.querySelectorAll('.btn-delete-room').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        const id = this.getAttribute('data-room-id');
+        const title = this.getAttribute('data-room-title') || 'Obrolan ini';
+        bukaModalHapus(id, title);
+    });
+});
 
 function closeDeleteModal() {
     deleteModalOverlay.classList.remove('show');
@@ -615,7 +690,31 @@ if (btnCancelDelete) {
 if (btnConfirmDelete) {
     btnConfirmDelete.addEventListener('click', function() {
         if (targetDeleteId) {
-            window.location.href = '?hapus_room=' + targetDeleteId;
+            // Gunakan metode POST dengan token CSRF (Aman dari eksploitasi CSRF melalui URL GET)
+            const postForm = document.createElement('form');
+            postForm.method = 'POST';
+            postForm.action = 'index.php';
+
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'hapus_room';
+            postForm.appendChild(actionInput);
+
+            const idInput = document.createElement('input');
+            idInput.type = 'hidden';
+            idInput.name = 'hapus_id';
+            idInput.value = targetDeleteId;
+            postForm.appendChild(idInput);
+
+            const tokenInput = document.createElement('input');
+            tokenInput.type = 'hidden';
+            tokenInput.name = 'csrf_token';
+            tokenInput.value = csrfTokenGlobal;
+            postForm.appendChild(tokenInput);
+
+            document.body.appendChild(postForm);
+            postForm.submit();
         }
     });
 }

@@ -11,6 +11,13 @@ function get_groq_reply($prompt, $history = []) {
     $url = GROQ_API_URL;
     $model = GROQ_MODEL;
 
+    if (empty($apiKey)) {
+        return [
+            'success' => false,
+            'error' => 'API Key Groq belum dikonfigurasi. Harap isi GROQ_API_KEY pada file .env Anda.'
+        ];
+    }
+
     $headers = [
         'Content-Type: application/json',
         'Authorization: ' . 'Bearer ' . $apiKey
@@ -55,15 +62,21 @@ function get_groq_reply($prompt, $history = []) {
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Memastikan kestabilan di lingkungan local Laragon
+    curl_setopt($ch, CURLOPT_TIMEOUT, 9); // Disesuaikan dengan batas eksekusi serverless Vercel (10 detik)
+    // Verifikasi SSL/TLS aktif sesuai standar keamanan CWE-295
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 
     $response = curl_exec($ch);
 
     if (curl_errno($ch)) {
         $error_msg = curl_error($ch);
         curl_close($ch);
-        return "⚠️ Maaf, terjadi gangguan jaringan: " . $error_msg;
+        error_log("Groq cURL Error: " . $error_msg);
+        return [
+            'success' => false,
+            'error' => 'Terjadi gangguan koneksi jaringan ke server AI: ' . $error_msg
+        ];
     }
 
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -72,9 +85,16 @@ function get_groq_reply($prompt, $history = []) {
     $result = json_decode($response, true);
 
     if ($httpCode !== 200 || !isset($result['choices'][0]['message']['content'])) {
-        $apiError = $result['error']['message'] ?? 'Respons tidak valid dari server AI.';
-        return "⚠️ Maaf, terjadi kendala saat memproses permintaan Anda: " . htmlspecialchars($apiError);
+        $apiError = $result['error']['message'] ?? ('Respons HTTP ' . $httpCode . ' dari server AI.');
+        error_log("Groq API Error [HTTP $httpCode]: " . $apiError);
+        return [
+            'success' => false,
+            'error' => 'Kendala memproses permintaan ke AI: ' . htmlspecialchars($apiError, ENT_QUOTES, 'UTF-8')
+        ];
     }
 
-    return $result['choices'][0]['message']['content'];
+    return [
+        'success' => true,
+        'reply' => $result['choices'][0]['message']['content']
+    ];
 }
