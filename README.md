@@ -4,12 +4,17 @@
   <p><strong>Aplikasi Web Chatbot Cerdas dengan Antarmuka Modern Terinspirasi dari Google Gemini, Claude, dan ChatGPT</strong></p>
 
   <p>
-    <img src="https://img.shields.io/badge/PHP-8.2%2B-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP 8.2+" />
-    <img src="https://img.shields.io/badge/MySQL-InnoDB%20utf8mb4-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL" />
+    <a href="https://chatbot-dipta-smoky.vercel.app"><img src="https://img.shields.io/badge/Live%20Demo-Vercel%20Production-black?style=for-the-badge&logo=vercel" alt="Live Demo" /></a>
+    <img src="https://img.shields.io/badge/PHP-8.2%2B%20%2F%208.5-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP" />
+    <img src="https://img.shields.io/badge/TiDB%20Cloud-Serverless%20MySQL-002D54?style=for-the-badge&logo=mysql&logoColor=white" alt="TiDB" />
     <img src="https://img.shields.io/badge/Groq%20Cloud-Ultra--Fast%20LLM-F05A28?style=for-the-badge&logo=fastapi&logoColor=white" alt="Groq" />
-    <img src="https://img.shields.io/badge/UI-Dark%20Mode%20Glassmorphism-6366F1?style=for-the-badge" alt="Dark Mode" />
+    <img src="https://img.shields.io/badge/Security-ECC%20Verified-10B981?style=for-the-badge" alt="Security Verified" />
   </p>
 </div>
+
+---
+
+> 📖 **Dokumentasi Lengkap Notion**: Untuk arsitektur sistem komprehensif, diagram Mermaid, kamus data database, spesifikasi API, dan hasil audit keamanan, lihat dokumen [docs/NOTION_PROJECT_DOCS.md](docs/NOTION_PROJECT_DOCS.md).
 
 ---
 
@@ -58,9 +63,12 @@ Melalui proyek ini, saya bereksperimen dalam menghubungkan antarmuka web dengan 
 ## 📁 Struktur Repositori
 
 ```text
+├── api/                    # Serverless Functions untuk Vercel (index & chat-ajax)
 ├── asset/
 │   ├── favicon.png         # Ikon favicon browser
 │   └── logo.png            # Logo resmi aplikasi Dipta AI
+├── docs/
+│   └── NOTION_PROJECT_DOCS.md # Dokumentasi lengkap format Notion
 ├── config.example.php      # Template konfigurasi database & API Key
 ├── config.php              # Konfigurasi aktif (database & Groq API)
 ├── database.sql            # Skema tabel database MySQL (rooms & chat)
@@ -68,6 +76,7 @@ Melalui proyek ini, saya bereksperimen dalam menghubungkan antarmuka web dengan 
 ├── index.php               # Halaman utama aplikasi (View & Controller)
 ├── chat-ajax.php           # Endpoint asynchronous untuk pengiriman pesan chat
 ├── style.css               # Stylesheet lengkap antarmuka dark mode
+├── vercel.json             # Konfigurasi deployment serverless Vercel
 ├── .gitignore              # Daftar file yang diabaikan oleh Git
 └── README.md               # Dokumentasi proyek
 ```
