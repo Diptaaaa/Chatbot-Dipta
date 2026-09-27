@@ -3,6 +3,11 @@
  * Konfigurasi Terpusat Aplikasi Chatbot Dipta
  */
 
+// Matikan tampilan notice/error ke output HTTP agar respons JSON tidak rusak di serverless
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
+
 // Muat konfigurasi dari file .env lokal jika ada
 if (file_exists(__DIR__ . '/.env')) {
     $envLines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);

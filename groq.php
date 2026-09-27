@@ -71,7 +71,6 @@ function get_groq_reply($prompt, $history = []) {
 
     if (curl_errno($ch)) {
         $error_msg = curl_error($ch);
-        curl_close($ch);
         error_log("Groq cURL Error: " . $error_msg);
         return [
             'success' => false,
@@ -80,7 +79,6 @@ function get_groq_reply($prompt, $history = []) {
     }
 
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
 
     $result = json_decode($response, true);
 
