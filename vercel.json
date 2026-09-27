@@ -1,11 +1,7 @@
 {
-  "version": 2,
   "functions": {
     "api/**/*.php": {
-      "runtime": "vercel-php@0.7.3"
-    },
-    "*.php": {
-      "runtime": "vercel-php@0.7.3"
+      "runtime": "vercel-php@0.9.0"
     }
   },
   "routes": [
@@ -19,11 +15,11 @@
     },
     {
       "src": "/chat-ajax.php",
-      "dest": "/chat-ajax.php"
+      "dest": "/api/chat-ajax.php"
     },
     {
       "src": "/(.*)",
-      "dest": "/index.php"
+      "dest": "/api/index.php"
     }
   ]
 }

@@ -45,7 +45,7 @@ if (isset($_GET['new']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POS
         $stmt->execute();
         $new_id = $conn->insert_id;
         $stmt->close();
-        header("Location: " . $_SERVER['PHP_SELF'] . "?room_id=" . $new_id);
+        header("Location: index.php?room_id=" . $new_id);
         exit;
     }
 }
@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['judul_room']) && trim
         $stmt->execute();
         $new_id = $conn->insert_id;
         $stmt->close();
-        header("Location: " . $_SERVER['PHP_SELF'] . "?room_id=" . $new_id);
+        header("Location: index.php?room_id=" . $new_id);
         exit;
     }
 }
@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $stmt->close();
         }
     }
-    header("Location: " . $_SERVER['PHP_SELF']);
+    header("Location: index.php");
     exit;
 }
 
@@ -100,7 +100,7 @@ while ($row = $res->fetch_assoc()) {
 // Jika belum ada room sama sekali di database, buat room default
 if (empty($rooms)) {
     $conn->query("INSERT INTO rooms (judul) VALUES ('Obrolan Baru')");
-    header("Location: " . $_SERVER['PHP_SELF']);
+    header("Location: index.php");
     exit;
 }
 
