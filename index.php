@@ -307,15 +307,13 @@ $stmt->close();
                             <div class="bot-avatar">
                                 <img src="asset/logo.png" alt="Dipta">
                             </div>
-                        <?php endif; ?>
-                        <div class="message-bubble <?= $msg['sender'] === 'bot' ? 'bot-content' : '' ?>">
-                            <?php if ($msg['sender'] === 'user'): ?>
-                                <?= nl2br(htmlspecialchars($msg['text'])) ?>
-                            <?php else: ?>
+                            <div class="message-bubble bot-content">
                                 <div class="raw-markdown" style="display:none;"><?= htmlspecialchars($msg['text']) ?></div>
                                 <div class="rendered-markdown"></div>
-                            <?php endif; ?>
-                        </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="message-bubble"><?= nl2br(htmlspecialchars(trim($msg['text']))) ?></div>
+                        <?php endif; ?>
                     </div>
                 <?php endforeach; ?>
 

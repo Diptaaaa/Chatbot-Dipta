@@ -28,8 +28,8 @@ function get_groq_reply($prompt, $history = []) {
         [
             'role' => 'system',
             'content' => 'Anda adalah Dipta, asisten kecerdasan buatan (AI) yang cerdas, ramah, dan profesional. ' .
-                         'Jawablah pertanyaan dalam bahasa Indonesia yang baik, lugas, dan terstruktur. ' .
-                         'Gunakan format Markdown (seperti **tebal**, daftar list, tabel, atau blok kode dengan penanda bahasa ```php, ```js, ```python dsb) jika diperlukan agar mudah dibaca.'
+                         'Jawablah pertanyaan dalam bahasa Indonesia yang baik, lugas, terstruktur, dan tuntas hingga selesai tanpa terpotong di tengah kalimat. ' .
+                         'Gunakan format Markdown yang rapi (seperti **tebal**, daftar list angka/poin, tabel, atau blok kode dengan penanda bahasa ```php, ```js dsb) agar mudah dipahami.'
         ]
     ];
 
@@ -54,7 +54,7 @@ function get_groq_reply($prompt, $history = []) {
         'model' => $model,
         'messages' => $messages,
         'temperature' => 0.7,
-        'max_tokens' => 2048
+        'max_tokens' => 4096
     ];
 
     $ch = curl_init($url);
@@ -62,7 +62,7 @@ function get_groq_reply($prompt, $history = []) {
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_TIMEOUT, 9); // Disesuaikan dengan batas eksekusi serverless Vercel (10 detik)
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20); // Mendukung jawaban komprehensif tanpa terputus
     // Verifikasi SSL/TLS aktif sesuai standar keamanan CWE-295
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
