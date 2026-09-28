@@ -1061,6 +1061,10 @@ body {
     cursor: pointer;
     transition: var(--transition);
     box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn-modal-confirm:hover {

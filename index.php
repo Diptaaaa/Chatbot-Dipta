@@ -393,7 +393,7 @@ if ($stmt) {
                         <div class="user-badge">
                             <span class="status-dot"></span>
                             <span>Member</span>
-                            <a href="index.php?action=logout" class="btn-logout" id="btnLogout" title="Keluar">Keluar</a>
+                            <button type="button" class="btn-logout" id="btnLogout" title="Keluar">Keluar</button>
                         </div>
                     </div>
                 </div>
@@ -555,6 +555,27 @@ if ($stmt) {
         <div class="modal-actions">
             <button type="button" class="btn-modal-cancel" id="btnCancelDelete">Batal</button>
             <button type="button" class="btn-modal-confirm" id="btnConfirmDelete">Hapus</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Konfirmasi Logout Kustom (Modern Glassmorphism) -->
+<div class="modal-overlay" id="logoutModalOverlay">
+    <div class="modal-dialog">
+        <div class="modal-icon-danger" style="background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.28); color: #f87171;">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+        </div>
+        <h3 class="modal-title">Keluar dari Akun?</h3>
+        <p class="modal-desc">
+            Anda akan beralih ke <strong>Mode Tamu</strong>. Riwayat obrolan akun Anda tetap tersimpan aman dan dapat diakses kembali saat Anda masuk.
+        </p>
+        <div class="modal-actions">
+            <button type="button" class="btn-modal-cancel" id="btnCancelLogout">Batal</button>
+            <a href="index.php?action=logout" class="btn-modal-confirm" id="btnConfirmLogout">Keluar</a>
         </div>
     </div>
 </div>

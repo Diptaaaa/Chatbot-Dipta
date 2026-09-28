@@ -829,21 +829,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Tombol Logout
+    // Modal Konfirmasi Logout Kustom (Modern Glassmorphism)
+    const logoutModalOverlay = document.getElementById('logoutModalOverlay');
     const btnLogout = document.getElementById('btnLogout');
-    if (btnLogout) {
+    const btnCancelLogout = document.getElementById('btnCancelLogout');
+
+    if (btnLogout && logoutModalOverlay) {
         btnLogout.addEventListener('click', (e) => {
-            if (!confirm('Yakin ingin keluar dari akun?')) {
-                e.preventDefault();
-                return;
-            }
-            // Langsung arahkan ke endpoint pembersihan cookie untuk keandalan maksimal
-            window.location.href = 'index.php?action=logout';
+            e.preventDefault();
+            logoutModalOverlay.classList.add('show');
+        });
+    }
+
+    if (btnCancelLogout && logoutModalOverlay) {
+        btnCancelLogout.addEventListener('click', () => {
+            logoutModalOverlay.classList.remove('show');
         });
     }
 
     // Tutup Modal jika klik backdrop
-    [deleteModalOverlay, renameModalOverlay, authModalOverlay].forEach(overlay => {
+    [deleteModalOverlay, renameModalOverlay, authModalOverlay, logoutModalOverlay].forEach(overlay => {
         if (overlay) {
             overlay.addEventListener('click', (e) => {
                 if (e.target === overlay) {
@@ -859,6 +864,7 @@ document.addEventListener('DOMContentLoaded', () => {
             deleteModalOverlay?.classList.remove('show');
             renameModalOverlay?.classList.remove('show');
             authModalOverlay?.classList.remove('show');
+            logoutModalOverlay?.classList.remove('show');
         }
     });
 });
