@@ -41,29 +41,39 @@ if (!$connected || $conn->connect_error) {
 // Pastikan charset UTF-8 mb4 untuk mendukung karakter internasional & emoji
 $conn->set_charset("utf8mb4");
 
-// Auto-migrasi ringan untuk memastikan kolom user_token, user_id, & tabel users tersedia
-$colCheck = $conn->query("SHOW COLUMNS FROM rooms LIKE 'user_token'");
-if ($colCheck && $colCheck->num_rows === 0) {
-    $conn->query("ALTER TABLE rooms ADD COLUMN user_token VARCHAR(64) NOT NULL DEFAULT '' AFTER id, ADD INDEX idx_rooms_user_token (user_token)");
-    @$conn->query("ALTER TABLE rooms ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
-    @$conn->query("ALTER TABLE chat ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+// Auto-migrasi ringan kompatibel dengan TiDB Cloud & MySQL
+// 1. Pastikan tabel users ada
+@$conn->query("CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nama VARCHAR(100) NOT NULL,
+    email VARCHAR(150) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+// 2. Pastikan kolom user_token ada di tabel rooms (tiap ALTER TABLE single-clause untuk TiDB)
+$colToken = @$conn->query("SHOW COLUMNS FROM rooms LIKE 'user_token'");
+if ($colToken && $colToken->num_rows === 0) {
+    @$conn->query("ALTER TABLE rooms ADD COLUMN user_token VARCHAR(64) NOT NULL DEFAULT ''");
+    @$conn->query("ALTER TABLE rooms ADD INDEX idx_rooms_user_token (user_token)");
 }
 
-$tableCheck = $conn->query("SHOW TABLES LIKE 'users'");
-if ($tableCheck && $tableCheck->num_rows === 0) {
-    $conn->query("CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        nama VARCHAR(100) NOT NULL,
-        email VARCHAR(150) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-}
-
-$colCheckUserId = $conn->query("SHOW COLUMNS FROM rooms LIKE 'user_id'");
-if ($colCheckUserId && $colCheckUserId->num_rows === 0) {
-    $conn->query("ALTER TABLE rooms ADD COLUMN user_id INT NULL AFTER user_token, ADD INDEX idx_rooms_user_id (user_id)");
+// 3. Pastikan kolom user_id ada di tabel rooms
+$colUserId = @$conn->query("SHOW COLUMNS FROM rooms LIKE 'user_id'");
+if ($colUserId && $colUserId->num_rows === 0) {
+    @$conn->query("ALTER TABLE rooms ADD COLUMN user_id INT NULL");
+    @$conn->query("ALTER TABLE rooms ADD INDEX idx_rooms_user_id (user_id)");
     @$conn->query("ALTER TABLE rooms ADD CONSTRAINT fk_rooms_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE");
+}
+
+// 4. Pastikan kolom created_at ada pada rooms & chat
+$colRoomsCreated = @$conn->query("SHOW COLUMNS FROM rooms LIKE 'created_at'");
+if ($colRoomsCreated && $colRoomsCreated->num_rows === 0) {
+    @$conn->query("ALTER TABLE rooms ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+}
+$colChatCreated = @$conn->query("SHOW COLUMNS FROM chat LIKE 'created_at'");
+if ($colChatCreated && $colChatCreated->num_rows === 0) {
+    @$conn->query("ALTER TABLE chat ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
 }
 
 /**

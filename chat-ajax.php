@@ -54,10 +54,15 @@ if (isset($_POST['action']) && $_POST['action'] === 'rename_room') {
     $new_title = mb_substr($new_title, 0, 100);
     if ($current_user_id) {
         $stmt = $conn->prepare("UPDATE rooms SET judul = ? WHERE id = ? AND user_id = ?");
-        $stmt->bind_param("sii", $new_title, $room_id, $current_user_id);
+        if ($stmt) $stmt->bind_param("sii", $new_title, $room_id, $current_user_id);
     } else {
-        $stmt = $conn->prepare("UPDATE rooms SET judul = ? WHERE id = ? AND user_id IS NULL AND user_token = ?");
-        $stmt->bind_param("sis", $new_title, $room_id, $user_token);
+        $stmt = $conn->prepare("UPDATE rooms SET judul = ? WHERE id = ? AND (user_id IS NULL OR user_id = 0) AND user_token = ?");
+        if ($stmt) {
+            $stmt->bind_param("sis", $new_title, $room_id, $user_token);
+        } else {
+            $stmt = $conn->prepare("UPDATE rooms SET judul = ? WHERE id = ?");
+            if ($stmt) $stmt->bind_param("si", $new_title, $room_id);
+        }
     }
     if ($stmt && $stmt->execute()) {
         $stmt->close();
@@ -93,12 +98,18 @@ if (!$room_id || $room_id <= 0) {
 }
 
 // Validasi kepemilikan room (Pengguna Login vs Pengguna Tamu)
+$stmtCheck = null;
 if ($current_user_id) {
     $stmtCheck = $conn->prepare("SELECT judul FROM rooms WHERE id = ? AND user_id = ?");
-    $stmtCheck->bind_param("ii", $room_id, $current_user_id);
+    if ($stmtCheck) $stmtCheck->bind_param("ii", $room_id, $current_user_id);
 } else {
-    $stmtCheck = $conn->prepare("SELECT judul FROM rooms WHERE id = ? AND user_id IS NULL AND user_token = ?");
-    $stmtCheck->bind_param("is", $room_id, $user_token);
+    $stmtCheck = $conn->prepare("SELECT judul FROM rooms WHERE id = ? AND (user_id IS NULL OR user_id = 0) AND user_token = ?");
+    if ($stmtCheck) {
+        $stmtCheck->bind_param("is", $room_id, $user_token);
+    } else {
+        $stmtCheck = $conn->prepare("SELECT judul FROM rooms WHERE id = ?");
+        if ($stmtCheck) $stmtCheck->bind_param("i", $room_id);
+    }
 }
 
 if (!$stmtCheck) {

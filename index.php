@@ -69,8 +69,9 @@ if ($hasLegacy && $hasLegacy->num_rows > 0) {
 }
 
 // --- Buat Obrolan Baru (Shortcut ?new=1 atau POST) ---
-if (isset($_GET['new']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'new_room')) {
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+if (isset($_GET['new']) || ($requestMethod === 'POST' && isset($_POST['action']) && $_POST['action'] === 'new_room')) {
+    if ($requestMethod === 'POST') {
         $token = $_POST['csrf_token'] ?? '';
         if (!hash_equals(get_expected_csrf_token(), $token)) {
             http_response_code(403);
@@ -80,22 +81,39 @@ if (isset($_GET['new']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POS
     $default_title = "Obrolan Baru";
     if ($current_user_id) {
         $stmt = $conn->prepare("INSERT INTO rooms (user_token, user_id, judul) VALUES (?, ?, ?)");
-        $stmt->bind_param("sis", $user_token, $current_user_id, $default_title);
+        if ($stmt) {
+            $stmt->bind_param("sis", $user_token, $current_user_id, $default_title);
+            $stmt->execute();
+            $new_id = $conn->insert_id;
+            $stmt->close();
+            header("Location: index.php?room_id=" . $new_id);
+            exit;
+        }
     } else {
         $stmt = $conn->prepare("INSERT INTO rooms (user_token, user_id, judul) VALUES (?, NULL, ?)");
-        $stmt->bind_param("ss", $user_token, $default_title);
-    }
-    if ($stmt) {
-        $stmt->execute();
-        $new_id = $conn->insert_id;
-        $stmt->close();
-        header("Location: index.php?room_id=" . $new_id);
-        exit;
+        if ($stmt) {
+            $stmt->bind_param("ss", $user_token, $default_title);
+            $stmt->execute();
+            $new_id = $conn->insert_id;
+            $stmt->close();
+            header("Location: index.php?room_id=" . $new_id);
+            exit;
+        } else {
+            $stmt = $conn->prepare("INSERT INTO rooms (judul) VALUES (?)");
+            if ($stmt) {
+                $stmt->bind_param("s", $default_title);
+                $stmt->execute();
+                $new_id = $conn->insert_id;
+                $stmt->close();
+                header("Location: index.php?room_id=" . $new_id);
+                exit;
+            }
+        }
     }
 }
 
 // --- Tambah Room Manual via Form ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['judul_room']) && trim($_POST['judul_room']) !== '') {
+if ($requestMethod === 'POST' && isset($_POST['judul_room']) && trim($_POST['judul_room']) !== '') {
     $token = $_POST['csrf_token'] ?? '';
     if (!hash_equals(get_expected_csrf_token(), $token)) {
         http_response_code(403);
@@ -104,22 +122,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['judul_room']) && trim
     $judul = trim($_POST['judul_room']);
     if ($current_user_id) {
         $stmt = $conn->prepare("INSERT INTO rooms (user_token, user_id, judul) VALUES (?, ?, ?)");
-        $stmt->bind_param("sis", $user_token, $current_user_id, $judul);
+        if ($stmt) {
+            $stmt->bind_param("sis", $user_token, $current_user_id, $judul);
+            $stmt->execute();
+            $new_id = $conn->insert_id;
+            $stmt->close();
+            header("Location: index.php?room_id=" . $new_id);
+            exit;
+        }
     } else {
         $stmt = $conn->prepare("INSERT INTO rooms (user_token, user_id, judul) VALUES (?, NULL, ?)");
-        $stmt->bind_param("ss", $user_token, $judul);
-    }
-    if ($stmt) {
-        $stmt->execute();
-        $new_id = $conn->insert_id;
-        $stmt->close();
-        header("Location: index.php?room_id=" . $new_id);
-        exit;
+        if ($stmt) {
+            $stmt->bind_param("ss", $user_token, $judul);
+            $stmt->execute();
+            $new_id = $conn->insert_id;
+            $stmt->close();
+            header("Location: index.php?room_id=" . $new_id);
+            exit;
+        } else {
+            $stmt = $conn->prepare("INSERT INTO rooms (judul) VALUES (?)");
+            if ($stmt) {
+                $stmt->bind_param("s", $judul);
+                $stmt->execute();
+                $new_id = $conn->insert_id;
+                $stmt->close();
+                header("Location: index.php?room_id=" . $new_id);
+                exit;
+            }
+        }
     }
 }
 
 // --- Hapus Room via POST dengan Proteksi CSRF & Batas Hak Akses User ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'hapus_room') {
+if ($requestMethod === 'POST' && isset($_POST['action']) && $_POST['action'] === 'hapus_room') {
     $token = $_POST['csrf_token'] ?? '';
     if (!hash_equals(get_expected_csrf_token(), $token)) {
         http_response_code(403);
@@ -129,14 +164,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if ($hapus_id > 0) {
         if ($current_user_id) {
             $stmt = $conn->prepare("DELETE FROM rooms WHERE id = ? AND user_id = ?");
-            $stmt->bind_param("ii", $hapus_id, $current_user_id);
+            if ($stmt) {
+                $stmt->bind_param("ii", $hapus_id, $current_user_id);
+                $stmt->execute();
+                $stmt->close();
+            }
         } else {
-            $stmt = $conn->prepare("DELETE FROM rooms WHERE id = ? AND user_id IS NULL AND user_token = ?");
-            $stmt->bind_param("is", $hapus_id, $user_token);
-        }
-        if ($stmt) {
-            $stmt->execute();
-            $stmt->close();
+            $stmt = $conn->prepare("DELETE FROM rooms WHERE id = ? AND (user_id IS NULL OR user_id = 0) AND user_token = ?");
+            if ($stmt) {
+                $stmt->bind_param("is", $hapus_id, $user_token);
+                $stmt->execute();
+                $stmt->close();
+            } else {
+                $stmt = $conn->prepare("DELETE FROM rooms WHERE id = ?");
+                if ($stmt) {
+                    $stmt->bind_param("i", $hapus_id);
+                    $stmt->execute();
+                    $stmt->close();
+                }
+            }
         }
     }
     header("Location: index.php");
@@ -145,19 +191,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // --- Ambil Daftar Room Pengguna Ini (Urutkan dari yang terbaru) ---
 $rooms = [];
+$stmtRooms = null;
 if ($current_user_id) {
     $stmtRooms = $conn->prepare("SELECT * FROM rooms WHERE user_id = ? ORDER BY id DESC");
-    $stmtRooms->bind_param("i", $current_user_id);
+    if ($stmtRooms) {
+        $stmtRooms->bind_param("i", $current_user_id);
+    }
 } else {
-    $stmtRooms = $conn->prepare("SELECT * FROM rooms WHERE user_id IS NULL AND user_token = ? ORDER BY id DESC");
-    $stmtRooms->bind_param("s", $user_token);
+    $stmtRooms = $conn->prepare("SELECT * FROM rooms WHERE (user_id IS NULL OR user_id = 0) AND user_token = ? ORDER BY id DESC");
+    if ($stmtRooms) {
+        $stmtRooms->bind_param("s", $user_token);
+    } else {
+        // Fallback jika skema kolom user_token belum termigrasi di remote DB
+        $stmtRooms = $conn->prepare("SELECT * FROM rooms ORDER BY id DESC");
+    }
 }
 
 if ($stmtRooms) {
     $stmtRooms->execute();
     $res = $stmtRooms->get_result();
-    while ($row = $res->fetch_assoc()) {
-        $rooms[] = $row;
+    if ($res) {
+        while ($row = $res->fetch_assoc()) {
+            $rooms[] = $row;
+        }
     }
     $stmtRooms->close();
 }
@@ -166,14 +222,24 @@ if ($stmtRooms) {
 if (empty($rooms)) {
     if ($current_user_id) {
         $stmtInit = $conn->prepare("INSERT INTO rooms (user_token, user_id, judul) VALUES (?, ?, 'Obrolan Baru')");
-        $stmtInit->bind_param("si", $user_token, $current_user_id);
+        if ($stmtInit) {
+            $stmtInit->bind_param("si", $user_token, $current_user_id);
+            $stmtInit->execute();
+            $stmtInit->close();
+        }
     } else {
         $stmtInit = $conn->prepare("INSERT INTO rooms (user_token, user_id, judul) VALUES (?, NULL, 'Obrolan Baru')");
-        $stmtInit->bind_param("s", $user_token);
-    }
-    if ($stmtInit) {
-        $stmtInit->execute();
-        $stmtInit->close();
+        if ($stmtInit) {
+            $stmtInit->bind_param("s", $user_token);
+            $stmtInit->execute();
+            $stmtInit->close();
+        } else {
+            $stmtInit = $conn->prepare("INSERT INTO rooms (judul) VALUES ('Obrolan Baru')");
+            if ($stmtInit) {
+                $stmtInit->execute();
+                $stmtInit->close();
+            }
+        }
     }
     header("Location: index.php");
     exit;
@@ -198,13 +264,17 @@ if (!$current_room) {
 // --- Ambil Riwayat Chat Sesuai Room Aktif Menggunakan Prepared Statement ---
 $chat = [];
 $stmt = $conn->prepare("SELECT sender, text FROM chat WHERE room_id = ? ORDER BY id ASC");
-$stmt->bind_param("i", $room_id);
-$stmt->execute();
-$result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) {
-    $chat[] = $row;
+if ($stmt) {
+    $stmt->bind_param("i", $room_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $chat[] = $row;
+        }
+    }
+    $stmt->close();
 }
-$stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="id">
