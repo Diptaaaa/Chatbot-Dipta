@@ -17,13 +17,27 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+$action = trim($_POST['action'] ?? ($_GET['action'] ?? ''));
+
+// --- AKSI: LOGOUT ---
+// Logout harus selalu berhasil dan tidak boleh terblokir oleh token CSRF kedaluwarsa
+if ($action === 'logout') {
+    clear_auth_cookie();
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+        header("Location: index.php");
+        exit;
+    }
+    echo json_encode(['success' => true, 'message' => 'Berhasil keluar.']);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['success' => false, 'error' => 'Metode permintaan tidak diizinkan.']);
     exit;
 }
 
-// Validasi Token CSRF
+// Validasi Token CSRF (untuk Login & Register)
 $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['csrf_token'] ?? '');
 $expected_token = $_COOKIE['dipta_csrf'] ?? ($_SESSION['csrf_token'] ?? '');
 
@@ -33,15 +47,7 @@ if (empty($csrf_token) || empty($expected_token) || !hash_equals($expected_token
     exit;
 }
 
-$action = trim($_POST['action'] ?? '');
 $guest_token = $_COOKIE['dipta_uid'] ?? '';
-
-// --- AKSI: LOGOUT ---
-if ($action === 'logout') {
-    clear_auth_cookie();
-    echo json_encode(['success' => true, 'message' => 'Berhasil keluar.']);
-    exit;
-}
 
 // --- AKSI: REGISTER ---
 if ($action === 'register') {

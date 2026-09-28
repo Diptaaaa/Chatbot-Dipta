@@ -832,19 +832,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tombol Logout
     const btnLogout = document.getElementById('btnLogout');
     if (btnLogout) {
-        btnLogout.addEventListener('click', () => {
-            if (confirm('Yakin ingin keluar dari akun?')) {
-                const fd = new FormData();
-                fd.set('action', 'logout');
-                fd.set('csrf_token', csrfToken);
-                fetch('auth-ajax.php', {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': csrfToken },
-                    body: fd
-                })
-                .then(() => window.location.reload())
-                .catch(() => window.location.reload());
+        btnLogout.addEventListener('click', (e) => {
+            if (!confirm('Yakin ingin keluar dari akun?')) {
+                e.preventDefault();
+                return;
             }
+            // Langsung arahkan ke endpoint pembersihan cookie untuk keandalan maksimal
+            window.location.href = 'index.php?action=logout';
         });
     }
 

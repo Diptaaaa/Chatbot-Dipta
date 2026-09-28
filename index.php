@@ -44,6 +44,13 @@ if (empty($_COOKIE['dipta_uid']) || !preg_match('/^[a-f0-9]{32}$/', $_COOKIE['di
     $user_token = $_COOKIE['dipta_uid'];
 }
 
+// --- Tangani Logout Langsung (Mencegah kendala AJAX/CSRF/Cache di Production) ---
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    clear_auth_cookie();
+    header("Location: index.php");
+    exit;
+}
+
 // Cek Pengguna yang Sedang Login (Autentikasi Hybrid)
 $current_user_id = get_current_user_id();
 $currentUser = null;
@@ -386,7 +393,7 @@ if ($stmt) {
                         <div class="user-badge">
                             <span class="status-dot"></span>
                             <span>Member</span>
-                            <button type="button" class="btn-logout" id="btnLogout" title="Keluar">Keluar</button>
+                            <a href="index.php?action=logout" class="btn-logout" id="btnLogout" title="Keluar">Keluar</a>
                         </div>
                     </div>
                 </div>

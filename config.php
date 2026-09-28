@@ -125,14 +125,25 @@ function get_current_user_id() {
     return null;
 }
 
+function is_app_https() {
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') return true;
+    if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') return true;
+    if (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on') return true;
+    if (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) return true;
+    if (isset($_SERVER['VERCEL']) || isset($_SERVER['VERCEL_ENV'])) return true;
+    return false;
+}
+
 function set_auth_cookie($userId) {
     $_SESSION['user_id'] = intval($userId);
     $secret = defined('DB_PASS') ? DB_PASS : 'dipta_default_key';
     $sig = hash_hmac('sha256', (string)$userId, $secret);
+    $secure = is_app_https();
+
     setcookie('dipta_auth', $userId . '.' . $sig, [
         'expires' => time() + 86400 * 30, // Berlaku 30 hari
         'path' => '/',
-        'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'secure' => $secure,
         'httponly' => true,
         'samesite' => 'Lax'
     ]);
@@ -140,11 +151,23 @@ function set_auth_cookie($userId) {
 
 function clear_auth_cookie() {
     unset($_SESSION['user_id']);
+    unset($_COOKIE['dipta_auth']);
+
+    // Hapus dengan flag secure true dan false agar terhapus apapun kondisi saat diset
     setcookie('dipta_auth', '', [
-        'expires' => time() - 3600,
+        'expires' => time() - 86400 * 30,
         'path' => '/',
-        'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'secure' => true,
         'httponly' => true,
         'samesite' => 'Lax'
     ]);
+    setcookie('dipta_auth', '', [
+        'expires' => time() - 86400 * 30,
+        'path' => '/',
+        'secure' => false,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    // Raw HTTP Set-Cookie header untuk memastikan proxy Vercel meneruskannya
+    header("Set-Cookie: dipta_auth=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax", false);
 }

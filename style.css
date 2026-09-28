@@ -1567,6 +1567,9 @@ body {
     padding: 2px 4px;
     border-radius: var(--radius-sm);
     transition: var(--transition);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
 }
 .btn-logout:hover {
     color: #ef4444;
