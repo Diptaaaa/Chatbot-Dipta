@@ -20,3 +20,7 @@ Desktop.ini
 # Logs
 *.log
 error_log
+
+# IDE & Assistant metadata
+.gemini/
+.agents/

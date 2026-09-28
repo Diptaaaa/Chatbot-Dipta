@@ -19,6 +19,10 @@
       "dest": "/api/chat-ajax.php"
     },
     {
+      "src": "/auth-ajax.php",
+      "dest": "/api/auth-ajax.php"
+    },
+    {
       "src": "/(.*)",
       "dest": "/api/index.php"
     }

@@ -33,8 +33,46 @@ if (empty($csrf_token) || empty($expected_token) || !hash_equals($expected_token
     exit;
 }
 
+$current_user_id = get_current_user_id();
+$user_token = $_COOKIE['dipta_uid'] ?? '';
+
+if (!$current_user_id && (empty($user_token) || !preg_match('/^[a-f0-9]{32}$/', $user_token))) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Sesi pengguna tidak valid. Silakan muat ulang halaman.']);
+    exit;
+}
+
+// --- AKSI: UBAH JUDUL ROOM (RENAME) ---
+if (isset($_POST['action']) && $_POST['action'] === 'rename_room') {
+    $new_title = trim($_POST['judul'] ?? '');
+    $room_id = filter_var($_POST['room_id'] ?? null, FILTER_VALIDATE_INT);
+    if (!$room_id || $room_id <= 0 || $new_title === '') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Judul dan ID obrolan wajib diisi.']);
+        exit;
+    }
+    $new_title = mb_substr($new_title, 0, 100);
+    if ($current_user_id) {
+        $stmt = $conn->prepare("UPDATE rooms SET judul = ? WHERE id = ? AND user_id = ?");
+        $stmt->bind_param("sii", $new_title, $room_id, $current_user_id);
+    } else {
+        $stmt = $conn->prepare("UPDATE rooms SET judul = ? WHERE id = ? AND user_id IS NULL AND user_token = ?");
+        $stmt->bind_param("sis", $new_title, $room_id, $user_token);
+    }
+    if ($stmt && $stmt->execute()) {
+        $stmt->close();
+        echo json_encode(['success' => true, 'new_title' => $new_title]);
+    } else {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Gagal mengubah nama obrolan.']);
+    }
+    exit;
+}
+
 $pesan = trim($_POST['pesan'] ?? '');
 $room_id = filter_var($_POST['room_id'] ?? null, FILTER_VALIDATE_INT);
+$selectedModel = trim($_POST['model'] ?? '');
+$isStream = isset($_POST['stream']) && ($_POST['stream'] === '1' || $_POST['stream'] === 'true');
 
 if ($pesan === '') {
     http_response_code(400);
@@ -54,23 +92,28 @@ if (!$room_id || $room_id <= 0) {
     exit;
 }
 
-// Validasi keberadaan room di database
-$stmtCheck = $conn->prepare("SELECT judul FROM rooms WHERE id = ?");
+// Validasi kepemilikan room (Pengguna Login vs Pengguna Tamu)
+if ($current_user_id) {
+    $stmtCheck = $conn->prepare("SELECT judul FROM rooms WHERE id = ? AND user_id = ?");
+    $stmtCheck->bind_param("ii", $room_id, $current_user_id);
+} else {
+    $stmtCheck = $conn->prepare("SELECT judul FROM rooms WHERE id = ? AND user_id IS NULL AND user_token = ?");
+    $stmtCheck->bind_param("is", $room_id, $user_token);
+}
+
 if (!$stmtCheck) {
     error_log("Database prepare error: " . $conn->error);
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Terjadi kesalahan internal pada server.']);
     exit;
 }
-$stmtCheck->bind_param("i", $room_id);
 $stmtCheck->execute();
-$resCheck = $stmtCheck->get_result();
-$roomData = $resCheck->fetch_assoc();
+$roomData = $stmtCheck->get_result()->fetch_assoc();
 $stmtCheck->close();
 
 if (!$roomData) {
     http_response_code(404);
-    echo json_encode(['success' => false, 'error' => 'Ruang obrolan tidak ditemukan.']);
+    echo json_encode(['success' => false, 'error' => 'Ruang obrolan tidak ditemukan atau bukan milik Anda.']);
     exit;
 }
 
@@ -97,9 +140,14 @@ $newTitle = null;
 if ($roomData['judul'] === 'Obrolan Baru' || $roomData['judul'] === 'Obrolan Utama') {
     $shortTitle = mb_substr($pesan, 0, 30);
     if (mb_strlen($pesan) > 30) $shortTitle .= '...';
-    $stmtUp = $conn->prepare("UPDATE rooms SET judul = ? WHERE id = ?");
+    if ($current_user_id) {
+        $stmtUp = $conn->prepare("UPDATE rooms SET judul = ? WHERE id = ? AND user_id = ?");
+        $stmtUp->bind_param("sii", $shortTitle, $room_id, $current_user_id);
+    } else {
+        $stmtUp = $conn->prepare("UPDATE rooms SET judul = ? WHERE id = ? AND user_id IS NULL AND user_token = ?");
+        $stmtUp->bind_param("sis", $shortTitle, $room_id, $user_token);
+    }
     if ($stmtUp) {
-        $stmtUp->bind_param("si", $shortTitle, $room_id);
         if ($stmtUp->execute()) {
             $newTitle = $shortTitle;
         }
@@ -119,12 +167,56 @@ if ($stmtHist) {
         }
     }
     $stmtHist->close();
-    // Urutkan dari pesan terlama ke terbaru
     $history = array_reverse($history);
 }
 
-// 3. Dapatkan balasan dari Groq AI dengan context memory
-$aiResult = get_groq_reply($pesan, $history);
+// 3. Mode Streaming Server-Sent Events (SSE)
+if ($isStream) {
+    // Matikan batasan waktu eksekusi untuk streaming respons panjang
+    set_time_limit(60);
+
+    header('Content-Type: text/event-stream; charset=utf-8');
+    header('Cache-Control: no-cache, no-transform');
+    header('Connection: keep-alive');
+    header('X-Accel-Buffering: no'); // Nonaktifkan buffer di Nginx & Vercel Proxy
+
+    if ($newTitle) {
+        echo "event: title\ndata: " . json_encode(['new_title' => $newTitle], JSON_UNESCAPED_UNICODE) . "\n\n";
+        if (ob_get_level() > 0) ob_flush();
+        flush();
+    }
+
+    $aiResult = stream_groq_reply($pesan, $history, $selectedModel, function($chunk) {
+        echo "event: chunk\ndata: " . json_encode(['chunk' => $chunk], JSON_UNESCAPED_UNICODE) . "\n\n";
+        if (ob_get_level() > 0) ob_flush();
+        flush();
+    });
+
+    if (!$aiResult['success'] && empty($aiResult['reply'])) {
+        echo "event: error\ndata: " . json_encode(['error' => $aiResult['error']], JSON_UNESCAPED_UNICODE) . "\n\n";
+        exit;
+    }
+
+    $balasan = $aiResult['reply'];
+
+    // Simpan balasan bot ke database
+    $stmtBot = $conn->prepare("INSERT INTO chat (sender, text, room_id) VALUES ('bot', ?, ?)");
+    if ($stmtBot) {
+        $stmtBot->bind_param("si", $balasan, $room_id);
+        $stmtBot->execute();
+        $stmtBot->close();
+    }
+
+    echo "event: done\ndata: " . json_encode([
+        'success' => true,
+        'model' => $aiResult['model'] ?? '',
+        'new_title' => $newTitle
+    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+    exit;
+}
+
+// 4. Mode Standar (Fallback Non-Streaming)
+$aiResult = get_groq_reply($pesan, $history, $selectedModel);
 if (!$aiResult['success']) {
     http_response_code(502);
     echo json_encode([
@@ -136,7 +228,7 @@ if (!$aiResult['success']) {
 
 $balasan = $aiResult['reply'];
 
-// 4. Simpan balasan bot ke database dengan Prepared Statement
+// Simpan balasan bot ke database
 $stmtBot = $conn->prepare("INSERT INTO chat (sender, text, room_id) VALUES ('bot', ?, ?)");
 if ($stmtBot) {
     $stmtBot->bind_param("si", $balasan, $room_id);
@@ -144,9 +236,10 @@ if ($stmtBot) {
     $stmtBot->close();
 }
 
-// 5. Kembalikan respons JSON
+// Kembalikan respons JSON
 echo json_encode([
     'success' => true,
     'reply' => $balasan,
-    'new_title' => $newTitle
+    'new_title' => $newTitle,
+    'model' => $aiResult['model'] ?? ''
 ], JSON_UNESCAPED_UNICODE);

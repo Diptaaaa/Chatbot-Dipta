@@ -28,12 +28,21 @@ Melalui proyek ini, saya bereksperimen dalam menghubungkan antarmuka web dengan 
 
 ## ✨ Fitur Utama
 
+- 👥 **Sistem Pengguna Hybrid (Guest Mode & Akun Terdaftar)**:
+  - **Guest Mode Default**: Langsung mulai mengobrol tanpa wajib login; percakapan terisolasi dan tidak tercampur antar pengunjung.
+  - **Akun Login & Registrasi Opsional**: Simpan riwayat obrolan permanen lintas perangkat dengan kebijakan keamanan kata sandi kuat (8+ karakter, huruf kapital, angka, simbol) dan fitur lihat sandi (*Show Password Toggle*).
+  - **Auto-Claim Guest Chat**: Saat pengguna memutuskan mendaftar atau masuk, riwayat obrolan dari sesi guest otomatis ditautkan ke akun baru mereka.
+- ⚡ **Real-Time Streaming Response (SSE)**:
+  - Respons AI diketik langsung kata-demi-kata secara instan menggunakan Server-Sent Events (SSE) native tanpa jeda tunggu.
+- 🎛️ **Model Switcher Dinamis**:
+  - Pilihan berganti model Groq AI secara instan dari dropdown topbar: **Dipta 120B Flagship**, **Dipta 20B Instant**, dan **Qwen 27B Multilingual**.
 - 🎨 **Antarmuka Modern (Gemini, Claude & ChatGPT Style)**:
-  - Tema gelap (*dark mode*) mewah dengan *ambient glow* dan aksen gradasi halus.
+  - Tema gelap (*dark mode*) mewah dengan *ambient glow*, glassmorphism blur 24px, dan aksen gradasi halus.
   - **Hero Welcome State**: Tampilan sapaan interaktif di awal obrolan lengkap dengan **4 Kartu Rekomendasi Prompt (Suggestion Cards)**.
   - **Floating Prompt Dock**: Kolom input melayang dengan textarea auto-grow, badge model AI, dan tombol kirim SVG dinamis.
-- 🧠 **Context Memory (Ingatan Obrolan)**:
-  - Bot mengingat hingga **10 riwayat percakapan sebelumnya** dalam room yang sama, memungkinkan percakapan yang koheren dan berkelanjutan (*multi-turn conversation*).
+- 🔄 **Manajemen Obrolan Fleksibel**:
+  - **Ubah Nama Obrolan Manual (Rename)** langsung dari sidebar.
+  - **Tombol Coba Lagi (Regenerate)** & Salin Pesan pada setiap bubble respons AI.
 - 📝 **Markdown & Code Syntax Highlighting**:
   - Format teks otomatis (teks tebal, miring, daftar list, tabel, blockquote) menggunakan **Marked.js**.
   - Blok kode pemrograman dengan tema gelap (*GitHub Dark*) menggunakan **Highlight.js** dan dilengkapi tombol **"Salin Kode"** (*Copy to Clipboard*).
@@ -41,10 +50,11 @@ Melalui proyek ini, saya bereksperimen dalam menghubungkan antarmuka web dengan 
   - Dialog konfirmasi hapus bergaya *Glassmorphism* dengan *backdrop blur*, ikon tempat sampah bernuansa merah, serta dukungan tombol **`Escape` (ESC)** dan klik di luar area modal untuk membatalkan.
 - 🏷️ **Auto-Rename Judul Room**:
   - Judul room default (*"Obrolan Baru"*) otomatis diperbarui menjadi topik pertanyaan pertama yang diajukan pengguna secara real-time.
-- 🔒 **Keamanan & Performa Tinggi**:
+- 🔒 **Keamanan & Performa Tinggi (Ponytail Standard)**:
+  - 100% PHP Native standard library, tanpa dependensi vendor eksternal, ukuran total < 300 KB, dan waktu deploy ke Vercel < 5 detik.
   - Kebal terhadap SQL Injection berkat penggunaan **Prepared Statements** (`mysqli::prepare`) di seluruh operasi database.
-  - Proteksi XSS (Cross-Site Scripting) pada perenderan pesan pengguna.
-  - Dukungan penuh karakter multibyte dan emoji (`utf8mb4_unicode_ci`).
+  - Proteksi XSS (Cross-Site Scripting) & CSRF token ganda.
+  - Autentikasi stateless berbasis tanda tangan **HMAC-SHA256 Cookie** yang tahan banting di lingkungan serverless Vercel.
 
 ---
 

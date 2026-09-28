@@ -40,3 +40,74 @@ if (!$connected || $conn->connect_error) {
 
 // Pastikan charset UTF-8 mb4 untuk mendukung karakter internasional & emoji
 $conn->set_charset("utf8mb4");
+
+// Auto-migrasi ringan untuk memastikan kolom user_token, user_id, & tabel users tersedia
+$colCheck = $conn->query("SHOW COLUMNS FROM rooms LIKE 'user_token'");
+if ($colCheck && $colCheck->num_rows === 0) {
+    $conn->query("ALTER TABLE rooms ADD COLUMN user_token VARCHAR(64) NOT NULL DEFAULT '' AFTER id, ADD INDEX idx_rooms_user_token (user_token)");
+    @$conn->query("ALTER TABLE rooms ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+    @$conn->query("ALTER TABLE chat ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+}
+
+$tableCheck = $conn->query("SHOW TABLES LIKE 'users'");
+if ($tableCheck && $tableCheck->num_rows === 0) {
+    $conn->query("CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nama VARCHAR(100) NOT NULL,
+        email VARCHAR(150) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+$colCheckUserId = $conn->query("SHOW COLUMNS FROM rooms LIKE 'user_id'");
+if ($colCheckUserId && $colCheckUserId->num_rows === 0) {
+    $conn->query("ALTER TABLE rooms ADD COLUMN user_id INT NULL AFTER user_token, ADD INDEX idx_rooms_user_id (user_id)");
+    @$conn->query("ALTER TABLE rooms ADD CONSTRAINT fk_rooms_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE");
+}
+
+/**
+ * Autentikasi Pengguna Stateless (Kompatibel dengan Vercel Serverless & Localhost)
+ */
+function get_current_user_id() {
+    if (!empty($_SESSION['user_id'])) {
+        return intval($_SESSION['user_id']);
+    }
+    if (!empty($_COOKIE['dipta_auth'])) {
+        $parts = explode('.', $_COOKIE['dipta_auth'], 2);
+        if (count($parts) === 2) {
+            list($uid, $sig) = $parts;
+            $secret = defined('DB_PASS') ? DB_PASS : 'dipta_default_key';
+            $expected = hash_hmac('sha256', $uid, $secret);
+            if (hash_equals($expected, $sig)) {
+                $_SESSION['user_id'] = intval($uid);
+                return intval($uid);
+            }
+        }
+    }
+    return null;
+}
+
+function set_auth_cookie($userId) {
+    $_SESSION['user_id'] = intval($userId);
+    $secret = defined('DB_PASS') ? DB_PASS : 'dipta_default_key';
+    $sig = hash_hmac('sha256', (string)$userId, $secret);
+    setcookie('dipta_auth', $userId . '.' . $sig, [
+        'expires' => time() + 86400 * 30, // Berlaku 30 hari
+        'path' => '/',
+        'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+}
+
+function clear_auth_cookie() {
+    unset($_SESSION['user_id']);
+    setcookie('dipta_auth', '', [
+        'expires' => time() - 3600,
+        'path' => '/',
+        'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+}
